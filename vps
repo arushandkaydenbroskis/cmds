@@ -1,0 +1,183 @@
+#!/bin/bash
+set -euo pipefail
+
+# -------------------------
+# KAYDEN - VPS Menu (SAFE)
+# - This script provides a menu, animations and placeholder actions.
+# - It DOES NOT execute remote code directly.
+# - If you want to run external scripts, download them first, inspect them, then run.
+# -------------------------
+
+# Color Definitions
+RED='\e[31m'
+GREEN='\e[32m'
+YELLOW='\e[33m'
+BLUE='\e[34m'
+CYAN='\e[36m'
+BOLD='\e[1m'
+RESET='\e[0m'
+
+# -------------------------
+# Animate KAYDEN Logo
+# -------------------------
+animate_logo() {
+  clear
+  local logo=(
+"  _  __          _           _         _ "
+" | |/ /___ _   _| | __ _  __| | ___   / |"
+" | ' // _ \ | | | |/ _\` |/ _\` |/ _ \  | |"
+" | . \  __/ |_| | | (_| | (_| |  __/  | |"
+" |_|\_\___|\__,_|_|\__,_|\__,_|\___|  |_|"
+  )
+
+  for line in "${logo[@]}"; do
+    echo -e "${CYAN}${line}${RESET}"
+    sleep 0.12
+  done
+  echo ""
+  sleep 0.3
+}
+
+# -------------------------
+# Helper: safe_download_and_run
+# -------------------------
+# Usage: safe_download_and_run <URL> <filename>
+# Downloads to filename, lets user inspect, then optionally runs it.
+safe_download_and_run() {
+  local url="$1"
+  local target="$2"
+
+  echo -e "${YELLOW}About to download:${RESET} ${url}"
+  echo -e "${YELLOW}Saved as:${RESET} ${target}"
+  echo -n "Continue? (y to download and inspect) > "
+  read -r ans
+  if [[ "$ans" != "y" && "$ans" != "Y" ]]; then
+    echo -e "${RED}Cancelled by user.${RESET}"
+    return 1
+  fi
+
+  # Download
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" -o "$target" || { echo -e "${RED}Download failed.${RESET}"; return 2; }
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$target" "$url" || { echo -e "${RED}Download failed.${RESET}"; return 2; }
+  else
+    echo -e "${RED}Neither curl nor wget found. Install one to use this feature.${RESET}"
+    return 3
+  fi
+
+  echo -e "${GREEN}Downloaded to ${target}${RESET}"
+  echo -e "${YELLOW}Please review the file before execution:${RESET}"
+  echo "------------------------------------------------------------"
+  # show first 200 lines (user can open full file manually)
+  sed -n '1,200p' "$target" || true
+  echo "------------------------------------------------------------"
+  echo -n "Do you want to make it executable and run it now? (y/N) > "
+  read -r runans
+  if [[ "$runans" == "y" || "$runans" == "Y" ]]; then
+    chmod +x "$target"
+    echo -e "${GREEN}Executing ${target} ...${RESET}"
+    ./"$target"
+  else
+    echo -e "${YELLOW}OK. File saved as ${target}. Run it later after manual review.${RESET}"
+  fi
+}
+
+# -------------------------
+# Menu Actions (SAFE placeholders)
+# -------------------------
+action_github_vps() {
+  echo -e "${BLUE}You chose: GitHub Real VPS (KAYDEN)${RESET}"
+  echo -e "${CYAN}This will download a repo or script from a URL you trust.${RESET}"
+  echo ""
+  read -r -p "Enter the trusted GitHub raw file URL or archive URL (or leave blank to cancel): " url
+  if [[ -z "$url" ]]; then
+    echo -e "${YELLOW}No URL entered. Returning to menu.${RESET}"
+    return
+  fi
+  target="kayden_github_script.sh"
+  safe_download_and_run "$url" "$target"
+}
+
+action_google_idx_vps() {
+  echo -e "${BLUE}You chose: Google IDX Real VPS (KAYDEN)${RESET}"
+  echo -e "${CYAN}This will create a safe dev.nix example and optionally download an external script.${RESET}"
+  echo ""
+
+  # Create a safe example dev.nix locally
+  mkdir -p "$HOME/.kayden_idx_example"
+  cat > "$HOME/.kayden_idx_example/dev.nix" <<'EOF'
+{ pkgs, ... }: {
+  channel = "stable-24.05";
+
+  packages = with pkgs; [
+    unzip
+    openssh
+    git
+    qemu_kvm
+    sudo
+  ];
+
+  env = {
+    EDITOR = "nano";
+  };
+}
+EOF
+
+  echo -e "${GREEN}Example dev.nix created at ${HOME}/.kayden_idx_example/dev.nix${RESET}"
+  echo -n "Do you want to download and inspect an external script now? (y/N) > "
+  read -r yn
+  if [[ "$yn" == "y" || "$yn" == "Y" ]]; then
+    read -r -p "Enter the trusted external script URL to download: " url2
+    if [[ -n "$url2" ]]; then
+      safe_download_and_run "$url2" "$HOME/.kayden_idx_example/kayden_idx_script.sh"
+    else
+      echo -e "${YELLOW}No URL provided. Returning to menu.${RESET}"
+    fi
+  fi
+}
+
+# -------------------------
+# Main Menu
+# -------------------------
+while true; do
+  animate_logo
+
+  echo -e "${YELLOW}Select an option:${RESET}"
+  echo -e "${GREEN}1) GitHub Real VPS (KAYDEN)${RESET}"
+  echo -e "${BLUE}2) Google IDX Real VPS (KAYDEN)${RESET}"
+  echo -e "${CYAN}3) Create local example (dev.nix)${RESET}"
+  echo -e "${RED}4) Exit${RESET}"
+  echo -ne "${YELLOW}Enter your choice (1-4): ${RESET}"
+  read -r choice
+
+  case "$choice" in
+    1)
+      action_github_vps
+      ;;
+    2)
+      action_google_idx_vps
+      ;;
+    3)
+      echo -e "${GREEN}Creating a local example folder with README...${RESET}"
+      mkdir -p "$HOME/kayden_vps_examples"
+      cat > "$HOME/kayden_vps_examples/README.txt" <<'EOF'
+KAYDEN VPS Examples
+- Place trusted scripts here.
+- Inspect before executing.
+- Example dev.nix available.
+EOF
+      echo -e "${GREEN}Created: ${HOME}/kayden_vps_examples${RESET}"
+      ;;
+    4)
+      echo -e "${CYAN}Exiting. Stay safe, KAYDEN!${RESET}"
+      exit 0
+      ;;
+    *)
+      echo -e "${RED}Invalid choice! Choose 1-4.${RESET}"
+      ;;
+  esac
+
+  echo -e "\n${YELLOW}Press Enter to return to the menu...${RESET}"
+  read -r _
+done
