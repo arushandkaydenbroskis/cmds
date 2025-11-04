@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+import os
+import random
+import string
+import time
+import sys
+
+# -------- Banner --------
+def display_banner():
+    print(r"""
+    _  __               _            
+| |/ /__ _ _   _  __| | ___ _ __  
+| ' // _` | | | |/ _` |/ _ \ '_ \ 
+| . \ (_| | |_| | (_| |  __/ | | |
+|_|\_\__,_|\__, |\__,_|\___|_| |_|
+           |___/                  
+             KAYDEN 24/7 CODE
+    """)
+
+# -------- Generate Random Text --------
+def generate_random_string(length=100):
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+
+# -------- Main Loop --------
+def create_edit_delete_file():
+    folder_name = os.path.expanduser("~/24")  # stores safely in home dir
+    os.makedirs(folder_name, exist_ok=True)
+
+    while True:
+        try:
+            file_name = os.path.join(folder_name, f"{generate_random_string(8)}.txt")
+
+            # create
+            with open(file_name, "w") as file:
+                for _ in range(random.randint(10, 100)):
+                    file.write(generate_random_string(100) + "\n")
+            print(f"[+] Created: {file_name}")
+            time.sleep(2)
+
+            # edit
+            with open(file_name, "w") as file:
+                for _ in range(random.randint(10, 100)):
+                    file.write(generate_random_string(100) + "\n")
+            print(f"[*] Edited: {file_name}")
+            time.sleep(1)
+
+            # delete
+            os.remove(file_name)
+            print(f"[-] Deleted: {file_name}")
+            time.sleep(1)
+
+        except KeyboardInterrupt:
+            print("\n[!] Script stopped manually.")
+            sys.exit(0)
+        except Exception as e:
+            print(f"[!] Error: {e}")
+            time.sleep(5)
+
+if __name__ == "__main__":
+    display_banner()
+    create_edit_delete_file()
