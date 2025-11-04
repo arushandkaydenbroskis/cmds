@@ -1,0 +1,63 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# -------------------------
+# Clear screen first
+# -------------------------
+clear
+
+# -------------------------
+# ASCII Logos Animation
+# -------------------------
+
+# First logo
+cat << "EOF"
+  _  __               _            
+| |/ /__ _ _   _  __| | ___ _ __  
+| ' // _` | | | |/ _` |/ _ \ '_ \ 
+| . \ (_| | |_| | (_| |  __/ | | |
+|_|\_\__,_|\__, |\__,_|\___|_| |_|
+           |___/                    
+
+EOF
+sleep 1
+clear
+
+# -------------------------
+# Show Credits
+# -------------------------
+
+msg1="Made By Kayden "
+msg2="Docker Made By Kayden"
+
+# Green for msg1
+echo -e "\033[1;32m$msg1\033[0m"
+sleep 0.05
+
+# Blue for msg2
+echo -e "\033[1;34m$msg2\033[0m"
+sleep 3
+clear
+
+# -------------------------
+# Run Container
+# -------------------------
+
+RAM=10240
+CPU=10
+DISK_SIZE=200G
+CONTAINER_NAME=kaydenvm
+IMAGE_NAME=kayden/debain12
+VMDATA_DIR="$PWD/vmdata"
+
+mkdir -p "$VMDATA_DIR"
+
+docker run -it --rm \
+  --name "$CONTAINER_NAME" \
+  --device /dev/kvm \
+  -v "$VMDATA_DIR":/vmdata \
+  -e RAM="$RAM" \
+  -e CPU="$CPU" \
+  -e DISK_SIZE="$DISK_SIZE" \
+  "$IMAGE_NAME"
