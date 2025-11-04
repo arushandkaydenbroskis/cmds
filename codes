@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+IMAGE="jishnuyt/manager:latest"
+CONTAINER_NAME="manager"
+EXTRA_ARGS=()
+AUTO_UPDATE_IMAGE=true
+
+log() { printf "[manager-installer] %s\n" "$*"; }
+err() { printf "[manager-installer][error] %s\n" "$*" >&2; }
+
+require_root() {
+  if [[ $EUID -ne 0 ]]; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo -v || { err "sudo not available or not permitted"; exit 1; }
+      export SUDO="sudo"
+    else
+      err "Run as root or install sudo"; exit 1
+    fi
+  else
+    export SUDO=""
+  fi
+}
+
+install_docker_if_missing() {
+  if ! command -v docker >/dev/null 2>&1; then
+    log "Docker not found, attempting installation (Debian/Ubuntu)..."
+    if [[ -f /etc/debian_version ]]; then
+      $SUDO apt-get update -y
+      $SUDO apt-get install -y ca-certificates curl gnupg
+      install -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
+        $(. /etc/os-release; echo "$VERSION_CODENAME") stable" | \
+        $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
+      $SUDO apt-get update -y
+      $SUDO apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      $SUDO systemctl enable --now docker
+    else
+      err "Docker not installed. Please install Docker for this distribution: docs.docker.com/engine/install/"; exit 1
+    fi
+  fi
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name) CONTAINER_NAME="${2:-manager}"; shift 2 ;;
+      --no-update) AUTO_UPDATE_IMAGE=false; shift ;;
+      --) shift; break ;;
+      *) EXTRA_ARGS+=("$1"); shift ;;
+    esac
+  done
+}
+
+pull_image_maybe() {
+  if [[ "$AUTO_UPDATE_IMAGE" == "true" ]]; then
+    log "Pulling latest image for ${IMAGE}..."
+    docker pull "$IMAGE"
+  else
+    log "Skipping image pull (--no-update provided)"
+  fi
+}
+
+stop_existing_container() {
+  if docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
+    if docker ps --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
+      log "Stopping running container $CONTAINER_NAME..."
+      docker stop "$CONTAINER_NAME" >/dev/null
+    fi
+    log "Removing existing container $CONTAINER_NAME..."
+    docker rm "$CONTAINER_NAME" >/dev/null
+  fi
+}
+
+run_container() {
+  log "Starting container $CONTAINER_NAME from $IMAGE..."
+  exec docker run -it --name "$CONTAINER_NAME" "${EXTRA_ARGS[@]}" "$IMAGE"
+}
+
+main() {
+  require_root
+  parse_args "$@"
+  install_docker_if_missing
+  pull_image_maybe
+  stop_existing_container
+  run_container
+}
+
+main "$@"
